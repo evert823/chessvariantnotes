@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>vps1.mcs2web.com</title>
+  <link rel="icon" href="/images/myicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+  <h1>Welcome to vps1.mcs2web.com/chessvariantnotes</h1>
+  <p>Here you can register as user and then post your notes about chess variants</p>
+
+  <!-- simple input + button to call /chessvariantnotes/api/trylogin -->
+  <label for="textInput">Text:</label>
+  <input id="textInput" type="text" placeholder="Enter text">
+  <button id="tryLoginBtn">Try Login (API)</button>
+
+  <!-- response will be shown here instead of alert -->
+  <div id="apiResponse" style="white-space:pre-wrap;border:1px solid #ccc;padding:8px;margin-top:10px;"></div>
+
+  <script>
+    document.getElementById('tryLoginBtn').addEventListener('click', async () => {
+      const text = document.getElementById('textInput').value;
+      const out = document.getElementById('apiResponse');
+      out.textContent = 'Loading...';
+      try {
+        const res = await fetch('/chessvariantnotes/api/trylogin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text })
+        });
+
+        const contentType = res.headers.get('content-type') || '';
+        let data = null;
+        if (contentType.includes('application/json')) {
+          data = await res.json().catch(() => null);
+        } else {
+          data = await res.text().catch(() => null);
+        }
+
+        if (res.ok) {
+          out.textContent = 'Status: ' + res.status + (data ? '\n\n' + (typeof data === 'string' ? data : JSON.stringify(data, null, 2)) : '');
+        } else {
+          let msg = '';
+          if (data) {
+            if (typeof data === 'string') msg = data;
+            else if (data.detail) msg = data.detail;
+            else msg = JSON.stringify(data, null, 2);
+          } else {
+            msg = 'HTTP ' + res.status;
+          }
+          out.textContent = 'Error: ' + msg;
+        }
+
+        console.log('API response', res.status, data);
+      } catch (err) {
+        console.error(err);
+        out.textContent = 'Request failed: ' + err.message;
+      }
+    });
+    // ...existing code...
+  </script>
+</body>
+</html>
