@@ -1,2 +1,8 @@
 fastapi
 uvicorn[standard]
+fastapi-users[sqlalchemy]
+sqlalchemy>=1.4
+aiosqlite
+passlib[bcrypt]
+python-jose[cryptography]
+email-validator
