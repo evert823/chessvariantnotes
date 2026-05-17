@@ -16,7 +16,8 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_credentials=True,  # <-- allow cookies for authentication
+    allow_credentials=True,
+    #pls note cookies strictly necessary for auth require no consent, only transparency
 )
 
 app.include_router(api_router, prefix="/chessvariantnotes/api")
