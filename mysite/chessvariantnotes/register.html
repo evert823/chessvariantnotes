@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Register - chessvariantnotes</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="./css/chessvariantnotes.css">
+</head>
+<body>
+  <div id="authArea"></div>
+
+  <h1>Register</h1>
+
+  <form id="registerForm" onsubmit="return false;">
+    <label for="emailInput">Email</label><br>
+    <input id="emailInput" type="email" required><br><br>
+
+    <label for="usernameInput">Username</label><br>
+    <input id="usernameInput" type="text" required><br><br>
+
+    <label for="passwordInput">Password</label><br>
+    <input id="passwordInput" type="password" required minlength="8"><br><br>
+
+    <button id="registerBtn" type="button">Create account</button>
+  </form>
+
+  <div id="registerMsg" role="status" style="margin-top:12px;"></div>
+
+  <script type="module">
+    import { renderAuthArea } from './js/auth.js';
+    import { initRegister } from './js/register.js';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await renderAuthArea();
+      initRegister({
+        formId: 'registerForm',
+        emailId: 'emailInput',
+        usernameId: 'usernameInput',
+        passwordId: 'passwordInput',
+        buttonId: 'registerBtn',
+        messageId: 'registerMsg'
+      });
+    });
+  </script>
+</body>
+</html>

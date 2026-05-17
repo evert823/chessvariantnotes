@@ -14,3 +14,8 @@ class UserRead(BaseModel):
 
     class Config:
         orm_mode = True
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    username: str
+    password: str  # client-sent hashed password (as you specified)

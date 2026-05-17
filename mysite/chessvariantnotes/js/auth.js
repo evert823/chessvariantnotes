@@ -43,7 +43,7 @@ export async function renderAuthArea(containerId = 'authArea') {
   } else {
     statusEl.textContent = 'Not logged in';
     actionsEl.innerHTML = `<button id="loginBtn">Login</button> <button id="signupBtn" style="margin-left:6px">Sign up</button>`;
-    document.getElementById('loginBtn').addEventListener('click', () => window.location.href = '/login');
-    document.getElementById('signupBtn').addEventListener('click', () => window.location.href = '/register');
+    document.getElementById('loginBtn').addEventListener('click', () => { window.location.href = '/chessvariantnotes/login.html'; });
+    document.getElementById('signupBtn').addEventListener('click', () => { window.location.href = '/chessvariantnotes/register.html'; });
   }
 }
