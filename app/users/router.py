@@ -7,6 +7,7 @@ import secrets
 import os
 import asyncio
 from dotenv import load_dotenv
+from app.users.security import hash_password
 
 # load .env values
 load_dotenv()
@@ -66,7 +67,8 @@ async def register(
     user = User(
         email=body.email,
         username=body.username,
-        hashed_password=body.password,
+        # re-hash client-side hash with a slow, salted algorithm before storing
+        hashed_password=hash_password(body.password),
         is_active=True,
         is_verified=False,
     )
