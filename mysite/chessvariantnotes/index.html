@@ -11,21 +11,20 @@
   <h1>Welcome to vps1.mcs2web.com/chessvariantnotes</h1>
   <p>Here you can register as user and then post your notes about chess variants</p>
 
-  <!-- simple input + button to call /chessvariantnotes/api/trylogin -->
   <label for="textInput">Text:</label>
   <input id="textInput" type="text" placeholder="Enter text">
-  <button id="tryLoginBtn">Try Login (API)</button>
+  <button id="tryHWBtn">Try Hello World (API)</button>
 
   <!-- response will be shown here instead of alert -->
   <div id="apiResponse" style="white-space:pre-wrap;border:1px solid #ccc;padding:8px;margin-top:10px;"></div>
 
   <script>
-    document.getElementById('tryLoginBtn').addEventListener('click', async () => {
+    document.getElementById('tryHWBtn').addEventListener('click', async () => {
       const text = document.getElementById('textInput').value;
       const out = document.getElementById('apiResponse');
       out.textContent = 'Loading...';
       try {
-        const res = await fetch('/chessvariantnotes/api/trylogin', {
+        const res = await fetch('/chessvariantnotes/api/tryhelloworld', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: text })

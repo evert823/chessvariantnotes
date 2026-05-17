@@ -1,7 +1,7 @@
 from app.classes.helloworld import HelloWorld
 from app.models.text_input import TextInput
 
-def try_login(input: TextInput):
+def try_helloworld(input: TextInput):
     try:
         hw = HelloWorld(input.text)
         return {
