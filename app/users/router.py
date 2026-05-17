@@ -15,7 +15,7 @@ load_dotenv()
 from app.users.db import get_async_session
 from app.users.models import User, Token
 from app.users.schemas import UserRead, RegisterRequest
-from app.users.mailer import send_confirmation_email
+from app.users.mailer import send_confirmation_email, send_simple_email
 
 router = APIRouter()
 
@@ -107,3 +107,66 @@ async def register(
         "email_sent": sent,
         "confirm_url_for_dev": None if sent else confirm_url
     }
+
+@router.get("/confirm")
+async def confirm_registration(
+    token: str,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Confirm registration:
+    - validate token (exists, type=verification, not used, not revoked, not expired)
+    - ensure target user exists and is not already verified
+    - mark token.used = True and user.is_verified = True, commit
+    - send completion email
+    """
+    if not token:
+        raise HTTPException(status_code=400, detail="token required")
+
+    result = await session.execute(
+        select(Token).where(Token.token == token, Token.token_type == "verification")
+    )
+    tkn = result.scalar_one_or_none()
+    if not tkn:
+        raise HTTPException(status_code=404, detail="invalid token")
+
+    # check token state
+    if tkn.revoked:
+        raise HTTPException(status_code=400, detail="token revoked")
+    if tkn.used:
+        # idempotent: if already used, respond OK
+        return {"status": "already_used"}
+    if tkn.expires_at and datetime.utcnow() > tkn.expires_at:
+        raise HTTPException(status_code=400, detail="token expired")
+
+    # fetch user
+    result = await session.execute(select(User).where(User.id == tkn.user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="user not found")
+
+    if user.is_verified:
+        # mark token used anyway to avoid reuse
+        tkn.used = True
+        session.add(tkn)
+        await session.commit()
+        return {"status": "already_verified"}
+
+    # perform state changes
+    tkn.used = True
+    user.is_verified = True
+    session.add_all([tkn, user])
+    await session.commit()
+
+    # send completion email (background)
+    site_base = os.getenv("SITE_URL", "https://vps1.mcs2web.com")
+    subject = "Registration confirmed"
+    body = f"Your account on {site_base} has been successfully confirmed. You can now login."
+
+    loop = asyncio.get_running_loop()
+    sent, err = await loop.run_in_executor(None, send_simple_email, user.email, subject, body)
+    if not sent:
+        # log dev link or error
+        print(f"[DEV] confirmation email send failed for {user.email}: {err}")
+
+    return {"status": "confirmed", "email_sent": sent}
