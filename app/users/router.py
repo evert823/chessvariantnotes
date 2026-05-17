@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status, Response
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
@@ -7,14 +7,14 @@ import secrets
 import os
 import asyncio
 from dotenv import load_dotenv
-from app.users.security import hash_password
+from app.users.security import hash_password, verify_password
 
 # load .env values
 load_dotenv()
 
 from app.users.db import get_async_session
 from app.users.models import User, Token
-from app.users.schemas import UserRead, RegisterRequest
+from app.users.schemas import UserRead, RegisterRequest, LoginRequest
 from app.users.mailer import send_confirmation_email, send_simple_email
 
 router = APIRouter()
@@ -170,3 +170,49 @@ async def confirm_registration(
         print(f"[DEV] confirmation email send failed for {user.email}: {err}")
 
     return {"status": "confirmed", "email_sent": sent}
+
+@router.post("/login", response_model=UserRead)
+async def login(
+    body: LoginRequest,
+    response: Response,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Login with username or email + client-side hashed password.
+    On success sets a HttpOnly cookie 'user_id' for the session.
+    """
+    if not body.password:
+        # password not provided -> remain logged out
+        raise HTTPException(status_code=400, detail="password required")
+
+    result = await session.execute(
+        select(User).where(or_(User.email == body.username_or_email, User.username == body.username_or_email))
+    )
+    user = result.scalar_one_or_none()
+    if not user or not user.is_active or not user.is_verified:
+        raise HTTPException(status_code=401, detail="invalid credentials")
+
+    # verify: body.password is the client-side hash; server stored a slow hash
+    if not verify_password(body.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="invalid credentials")
+
+    # set session cookie (for PoC). In production use secure session tokens / JWTs.
+    print("DEBUG login for", user.id)   # <--- add temporarily
+    response.set_cookie(
+        key="user_id",
+        value=user.id,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        path="/",
+        max_age=3600,  # adjust as needed
+    )
+    return user
+
+@router.post("/logout")
+async def logout(response: Response):
+    """
+    Clear session cookie.
+    """
+    response.delete_cookie("user_id", path="/")
+    return {"status": "logged_out"}

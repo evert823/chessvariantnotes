@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login - chessvariantnotes</title>
+  <link rel="stylesheet" href="./css/chessvariantnotes.css" />
+</head>
+<body>
+  <div id="authArea"></div>
+
+  <h1>Login</h1>
+
+  <form id="loginForm" onsubmit="return false;">
+    <label for="userInput">Email or Username</label><br>
+    <input id="userInput" type="text" required /><br><br>
+
+    <label for="passwordInput">Password</label><br>
+    <input id="passwordInput" type="password" required minlength="8" /><br><br>
+
+    <button id="loginBtn" type="button">Sign in</button>
+  </form>
+
+  <div id="loginMsg" role="status" style="margin-top:12px;"></div>
+
+  <script type="module">
+    import { renderAuthArea } from './js/auth.js';
+    import { initLogin } from './js/login.js';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await renderAuthArea();
+      initLogin({
+        formId: 'loginForm',
+        userId: 'userInput',
+        passwordId: 'passwordInput',
+        buttonId: 'loginBtn',
+        messageId: 'loginMsg'
+      });
+    });
+  </script>
+</body>
+</html>

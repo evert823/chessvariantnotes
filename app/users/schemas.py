@@ -19,3 +19,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     username: str
     password: str  # client-sent hashed password (as you specified)
+
+class LoginRequest(BaseModel):
+    username_or_email: str
+    password: str  # client-side hashed password
