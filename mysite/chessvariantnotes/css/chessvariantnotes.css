@@ -1,0 +1,11 @@
+#authArea {
+  margin-bottom: 12px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 8px;
+}
+#apiResponse {
+  white-space: pre-wrap;
+  border: 1px solid #ccc;
+  padding: 8px;
+  margin-top: 10px;
+}
