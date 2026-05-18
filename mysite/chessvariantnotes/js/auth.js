@@ -1,9 +1,6 @@
 export async function getCurrentUser() {
-  const headers = {};
-  const storedUser = localStorage.getItem('userId');
-  if (storedUser) headers['X-User-Id'] = storedUser;
   try {
-    const res = await fetch('/auth/me', { method: 'GET', headers, credentials: 'include' });
+    const res = await fetch('/auth/me', { method: 'GET', credentials: 'include' });
     if (!res.ok) return null;
     return await res.json();
   } catch {

@@ -29,25 +29,19 @@ async def list_users(session: AsyncSession = Depends(get_async_session)):
     users = result.scalars().all()
     return users
 
-@router.get("/me", response_model=UserRead)
+@router.get("/me", response_model=Optional[UserRead])
 async def get_current_user(
     request: Request,
-    x_user_id: Optional[str] = Header(None, convert_underscores=False),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """
-    PoC auth check:
-    - prefer cookie 'user_id' or 'session_user_id'
-    - fall back to X-User-Id header (useful for manual testing / localStorage)
-    Replace with real JWT/cookie auth later.
-    """
-    user_id = request.cookies.get("user_id") or request.cookies.get("session_user_id") or x_user_id
+    print(f"{request.cookies.get("user_id")}")
+    user_id = request.cookies.get("user_id")
     if not user_id:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        return None
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        return None
     return user
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -197,7 +191,6 @@ async def login(
         raise HTTPException(status_code=401, detail="invalid credentials")
 
     # set session cookie (for PoC). In production use secure session tokens / JWTs.
-    print("DEBUG login for", user.id)   # <--- add temporarily
     response.set_cookie(
         key="user_id",
         value=user.id,
