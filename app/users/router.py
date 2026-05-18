@@ -34,7 +34,6 @@ async def get_current_user(
     request: Request,
     session: AsyncSession = Depends(get_async_session),
 ):
-    print(f"{request.cookies.get("user_id")}")
     user_id = request.cookies.get("user_id")
     if not user_id:
         return None

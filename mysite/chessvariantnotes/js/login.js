@@ -7,9 +7,12 @@ export async function sha256Hex(str) {
 }
 
 export function initLogin(ids = {}) {
-    const userEl = document.getElementById(ids.userId || 'userInput');
-    const pwdEl = document.getElementById(ids.passwordId || 'passwordInput');
-    const btn = document.getElementById(ids.buttonId || 'loginBtn');
+    const formEl = document.getElementById(ids.formId || 'loginForm');
+    if (!formEl) return;
+
+    const userEl = formEl.querySelector(`#${ids.userId || 'userInput'}`);
+    const pwdEl = formEl.querySelector(`#${ids.passwordId || 'passwordInput'}`);
+    const btn = formEl.querySelector(`#${ids.buttonId || 'loginBtn'}`);
     const msg = document.getElementById(ids.messageId || 'loginMsg');
 
     if (!userEl || !pwdEl || !btn || !msg) return;
@@ -46,7 +49,6 @@ export function initLogin(ids = {}) {
                 msg.textContent = 'Signed in';
                 try { const mod = await import('./auth.js'); await mod.renderAuthArea(); } catch (_) {}
             } else {
-                // show clear messages for common statuses
                 if (res.status === 401) {
                     msg.textContent = 'Invalid username or password.';
                 } else if (res.status === 400) {
