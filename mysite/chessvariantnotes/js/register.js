@@ -1,3 +1,5 @@
+import { validatePassword } from './password.js';
+
 export async function sha256Hex(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -20,6 +22,8 @@ export function initRegister(ids = {}) {
       const email = emailEl.value.trim();
       const username = usernameEl.value.trim();
       const password = passwordEl.value;
+      const v = validatePassword(password);
+      if (!v.ok) { msg.textContent = v.message; btn.disabled = false; return; }
       if (!email || !username || !password) throw new Error('All fields required');
 
       // client-side hash (you said hashed password will be sent)

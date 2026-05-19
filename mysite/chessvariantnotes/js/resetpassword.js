@@ -1,3 +1,5 @@
+import { validatePassword } from './password.js';
+
 export async function sha256Hex(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -27,11 +29,9 @@ export function initResetPassword({ formId, passwordId, buttonId, messageId }) {
 
   async function doRequest() {
     const password = passwordInput.value || '';
-    if (password.length < 8) {
-      msg.textContent = 'Password must be at least 8 characters.';
-      return;
-    }
-
+    const v = validatePassword(password);
+    if (!v.ok) { msg.textContent = v.message; return; }
+    // then client-side hash and POST as you already do
     button.disabled = true;
     msg.textContent = 'Setting password...';
 
