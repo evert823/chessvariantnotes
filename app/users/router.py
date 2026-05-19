@@ -8,6 +8,7 @@ import os
 import asyncio
 from dotenv import load_dotenv
 from app.users.security import hash_password, verify_password
+from urllib.parse import quote_plus
 
 # load .env values
 load_dotenv()
@@ -253,7 +254,7 @@ async def request_reset_password(
 
     # build reset URL (include token + username per requirement)
     site_base = os.getenv("SITE_URL", "https://vps1.mcs2web.com")
-    reset_url = f"{site_base}/auth/resetpassword?token={token_str}&username={user.username}"
+    reset_url = f"{site_base}/chessvariantnotes/resetpassword.html?token={quote_plus(token_str)}&username={quote_plus(user.username)}"
 
     # send email in background thread
     subject = "Password reset request"
