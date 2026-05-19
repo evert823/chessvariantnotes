@@ -23,3 +23,13 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     username_or_email: str
     password: str  # client-side hashed password
+
+class ResetPasswordRequest1(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest2(BaseModel):
+    token: str
+    email: EmailStr
+    username: str
+    password: str  # client-sent hashed password (as you specified)
+

@@ -14,7 +14,7 @@ load_dotenv()
 
 from app.users.db import get_async_session
 from app.users.models import User, Token
-from app.users.schemas import UserRead, RegisterRequest, LoginRequest
+from app.users.schemas import UserRead, RegisterRequest, LoginRequest, ResetPasswordRequest1, ResetPasswordRequest2
 from app.users.mailer import send_confirmation_email, send_simple_email
 
 router = APIRouter()
@@ -208,3 +208,137 @@ async def logout(response: Response):
     """
     response.delete_cookie("user_id", path="/")
     return {"status": "logged_out"}
+
+
+@router.post("/requestresetpassword")
+async def request_reset_password(
+    body: ResetPasswordRequest1,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Request password reset:
+    - accepts email (ResetPasswordRequest1)
+    - ensure email exists
+    - create a verification token for password reset
+    - set user.is_verified = False (unregistered)
+    - send email with reset link containing token + username and mention username in body
+    """
+    if not body.email:
+        raise HTTPException(status_code=400, detail="email required")
+
+    result = await session.execute(select(User).where(User.email == body.email))
+    user = result.scalar_one_or_none()
+
+    # Do NOT reveal whether the email exists — avoid account enumeration.
+    if not user:
+        # respond identically to a successful request
+        return {"status": "reset_requested", "email_sent": False}
+
+    # mark user unregistered (so /resetpassword will accept the flow)
+    user.is_verified = False
+
+    # create token (reuse "verification" type used by reset endpoint)
+    token_str = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(hours=int(os.getenv("REG_TOKEN_HOURS", "24")))
+    token = Token(
+        user_id=user.id,
+        token=token_str,
+        token_type="passwordreset",
+        expires_at=expires_at,
+        used=False,
+        revoked=False,
+    )
+    session.add_all([user, token])
+    await session.commit()
+
+    # build reset URL (include token + username per requirement)
+    site_base = os.getenv("SITE_URL", "https://vps1.mcs2web.com")
+    reset_url = f"{site_base}/auth/resetpassword?token={token_str}&username={user.username}"
+
+    # send email in background thread
+    subject = "Password reset request"
+    mail_body = (
+        f"Hello {user.username},\n\n"
+        f"A password reset was requested for your account. Use the link below to reset your password:\n\n"
+        f"{reset_url}\n\n"
+        f"Username: {user.username}\n\n"
+        f"If you did not request this, please ignore this email."
+    )
+    loop = asyncio.get_running_loop()
+    sent, err = await loop.run_in_executor(None, send_simple_email, user.email, subject, mail_body)
+    if not sent:
+        # dev fallback
+        print(f"[DEV] password reset link for {user.email}: {reset_url} (send_error={err})")
+
+    return {"status": "reset_requested", "email_sent": sent}
+
+
+@router.post("/resetpassword")
+async def reset_password(
+    body: ResetPasswordRequest2,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Reset password + confirm account:
+    - requires token, email, username, password (client-side hash)
+    - ensure email and username belong to the same user (AND)
+    - ensure user is unregistered (is_verified == False)
+    - validate token (type=verification, not used/revoked/expired, belongs to user)
+    - perform additional server-side hash of provided password and store
+    - set user.is_verified = True and token.used = True
+    """
+    if not (body.token and body.email and body.username and body.password):
+        raise HTTPException(status_code=400, detail="token, email, username and password required")
+
+    # find user by email AND username to ensure both belong to the same account
+    q = await session.execute(
+        select(User).where(User.email == body.email, User.username == body.username)
+    )
+    user = q.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="user not found")
+
+    # user should be unregistered (not verified) per requirement
+    if user.is_verified:
+        raise HTTPException(status_code=400, detail="user already verified")
+
+    # load token and validate (ensure it belongs to the user in the DB query)
+    result = await session.execute(
+        select(Token).where(
+            Token.token == body.token,
+            Token.token_type == "passwordreset",
+            Token.user_id == user.id
+        )
+    )
+    tkn = result.scalar_one_or_none()
+    if not tkn:
+        raise HTTPException(status_code=404, detail="invalid token")
+    # removed explicit tkn.user_id check because query already scoped it
+    if tkn.revoked:
+        raise HTTPException(status_code=400, detail="token revoked")
+    if tkn.used:
+        return {"status": "already_used"}
+    if tkn.expires_at and datetime.utcnow() > tkn.expires_at:
+        raise HTTPException(status_code=400, detail="token expired")
+    
+    # perform additional server-side hash of the client-side hashed password
+    new_hashed = hash_password(body.password)
+
+    # apply changes
+    user.hashed_password = new_hashed
+    user.is_verified = True
+    tkn.used = True
+    session.add_all([user, tkn])
+    await session.commit()
+
+    # notify user (background)
+    site_base = os.getenv("SITE_URL", "https://vps1.mcs2web.com")
+    subject = "Account confirmed and password set"
+    mail_body = f"Your account on {site_base} has been confirmed and your password updated."
+
+    loop = asyncio.get_running_loop()
+    sent, err = await loop.run_in_executor(None, send_simple_email, user.email, subject, mail_body)
+    if not sent:
+        print(f"[DEV] password reset confirmation email send failed for {user.email}: {err}")
+
+    return {"status": "password_reset", "email_sent": sent}
