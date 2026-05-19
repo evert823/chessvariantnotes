@@ -29,7 +29,6 @@ class ResetPasswordRequest1(BaseModel):
 
 class ResetPasswordRequest2(BaseModel):
     token: str
-    email: EmailStr
     username: str
     password: str  # client-sent hashed password (as you specified)
 

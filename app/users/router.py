@@ -280,19 +280,18 @@ async def reset_password(
 ):
     """
     Reset password + confirm account:
-    - requires token, email, username, password (client-side hash)
-    - ensure email and username belong to the same user (AND)
+    - requires token, username, password (client-side hash)
     - ensure user is unregistered (is_verified == False)
     - validate token (type=verification, not used/revoked/expired, belongs to user)
     - perform additional server-side hash of provided password and store
     - set user.is_verified = True and token.used = True
     """
-    if not (body.token and body.email and body.username and body.password):
-        raise HTTPException(status_code=400, detail="token, email, username and password required")
+    if not (body.token and body.username and body.password):
+        raise HTTPException(status_code=400, detail="token, username and password required")
 
-    # find user by email AND username to ensure both belong to the same account
+    # find user by username to ensure both belong to the same account
     q = await session.execute(
-        select(User).where(User.email == body.email, User.username == body.username)
+        select(User).where(User.username == body.username)
     )
     user = q.scalar_one_or_none()
     if not user:
