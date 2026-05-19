@@ -32,15 +32,19 @@ export async function renderAuthArea(containerId = 'authArea') {
   const user = await getCurrentUser();
   if (user) {
     statusEl.textContent = `Logged in as ${escapeHtml(user.username || user.email || user.id)}`;
-    actionsEl.innerHTML = `<button id="logoutBtn">Logout</button>`;
+    actionsEl.innerHTML = `<button id="logoutBtn">Logout</button> <button id="resetBtn" style="margin-left:6px">Reset password</button>`;
     document.getElementById('logoutBtn').addEventListener('click', async () => {
       await logout();
       await renderAuthArea(containerId);
     });
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      window.location.href = '/chessvariantnotes/requestresetpassword.html';
+    });
   } else {
     statusEl.textContent = 'Not logged in';
-    actionsEl.innerHTML = `<button id="loginBtn">Login</button> <button id="signupBtn" style="margin-left:6px">Sign up</button>`;
+    actionsEl.innerHTML = `<button id="loginBtn">Login</button> <button id="signupBtn" style="margin-left:6px">Sign up</button> <button id="resetBtn" style="margin-left:6px">Reset password</button>`;
     document.getElementById('loginBtn').addEventListener('click', () => { window.location.href = '/chessvariantnotes/login.html'; });
     document.getElementById('signupBtn').addEventListener('click', () => { window.location.href = '/chessvariantnotes/register.html'; });
+    document.getElementById('resetBtn').addEventListener('click', () => { window.location.href = '/chessvariantnotes/requestresetpassword.html'; });
   }
 }
