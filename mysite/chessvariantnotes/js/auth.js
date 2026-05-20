@@ -32,13 +32,16 @@ export async function renderAuthArea(containerId = 'authArea') {
   const user = await getCurrentUser();
   if (user) {
     statusEl.textContent = `Logged in as ${escapeHtml(user.username || user.email || user.id)}`;
-    actionsEl.innerHTML = `<button id="logoutBtn">Logout</button> <button id="resetBtn" style="margin-left:6px">Reset password</button>`;
+    actionsEl.innerHTML = `<button id="logoutBtn">Logout</button> <button id="resetBtn" style="margin-left:6px">Reset password</button> <button id="changeUsernameBtn" style="margin-left:6px">Change username</button>`;
     document.getElementById('logoutBtn').addEventListener('click', async () => {
       await logout();
       await renderAuthArea(containerId);
     });
     document.getElementById('resetBtn').addEventListener('click', () => {
       window.location.href = '/chessvariantnotes/requestresetpassword.html';
+    });
+    document.getElementById('changeUsernameBtn').addEventListener('click', () => {
+      window.location.href = '/chessvariantnotes/changeusername.html';
     });
   } else {
     statusEl.textContent = 'Not logged in';

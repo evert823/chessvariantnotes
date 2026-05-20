@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Change username - chessvariantnotes</title>
+  <link rel="icon" href="/images/myicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="./css/chessvariantnotes.css">
+</head>
+<body>
+  <div id="authArea"></div>
+
+  <h1>Change username</h1>
+
+  <form id="changeUsernameForm" onsubmit="return false;">
+    <label for="newUsernameInput">New username</label><br>
+    <input id="newUsernameInput" type="text" required><br><br>
+
+    <label for="currentPasswordInput">Current password</label><br>
+    <input id="currentPasswordInput" type="password" required><br><br>
+
+    <button id="changeUsernameBtn" type="button">Change username</button>
+  </form>
+
+  <div id="changeUsernameMsg" role="status" style="margin-top:12px;"></div>
+
+  <script type="module">
+    import { renderAuthArea } from './js/auth.js';
+    import { initChangeUsername } from './js/changeusername.js';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await renderAuthArea();
+      initChangeUsername({
+        formId: 'changeUsernameForm',
+        newUsernameId: 'newUsernameInput',
+        passwordId: 'currentPasswordInput',
+        buttonId: 'changeUsernameBtn',
+        messageId: 'changeUsernameMsg',
+        onSuccess: renderAuthArea
+      });
+    });
+  </script>
+</body>
+</html>
