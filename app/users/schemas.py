@@ -24,6 +24,10 @@ class LoginRequest(BaseModel):
     username_or_email: str
     password: str  # client-side hashed password
 
+class ChangeUsernameRequest(BaseModel):
+    new_username: str
+    password: str  # client-side hashed password
+
 class ResetPasswordRequest1(BaseModel):
     email: EmailStr
 

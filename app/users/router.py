@@ -1,6 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status, Response
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
 import secrets
@@ -15,7 +15,8 @@ load_dotenv()
 
 from app.users.db import get_async_session
 from app.users.models import User, Token
-from app.users.schemas import UserRead, RegisterRequest, LoginRequest, ResetPasswordRequest1, ResetPasswordRequest2
+from app.users.schemas import UserRead, RegisterRequest, LoginRequest
+from app.users.schemas import ResetPasswordRequest1, ResetPasswordRequest2, ChangeUsernameRequest
 from app.users.mailer import send_confirmation_email, send_simple_email
 
 router = APIRouter()
@@ -49,9 +50,13 @@ async def register(
     body: RegisterRequest,
     session: AsyncSession = Depends(get_async_session),
 ):
+    username_clean = (body.username or "").strip()
+    if not username_clean:
+        raise HTTPException(status_code=400, detail="username required")
+
     # uniqueness check
     q = await session.execute(
-        select(User).where(or_(User.email == body.email, User.username == body.username))
+        select(User).where(or_(User.email == body.email, func.lower(User.username) == func.lower(username_clean)))
     )
     exists = q.scalar_one_or_none()
     if exists:
@@ -60,7 +65,7 @@ async def register(
     # create user (not yet verified)
     user = User(
         email=body.email,
-        username=body.username,
+        username=username_clean,
         # re-hash client-side hash with a slow, salted algorithm before storing
         hashed_password=hash_password(body.password),
         is_active=True,
@@ -180,7 +185,12 @@ async def login(
         raise HTTPException(status_code=400, detail="password required")
 
     result = await session.execute(
-        select(User).where(or_(User.email == body.username_or_email, User.username == body.username_or_email))
+        select(User).where(
+            or_(
+                User.email == body.username_or_email,
+                func.lower(User.username) == func.lower(body.username_or_email)
+            )
+        )
     )
     user = result.scalar_one_or_none()
     if not user or not user.is_active or not user.is_verified:
@@ -342,3 +352,52 @@ async def reset_password(
         print(f"[DEV] password reset confirmation email send failed for {user.email}: {err}")
 
     return {"status": "password_reset", "email_sent": sent}
+
+@router.post("/changeusername")
+async def change_username(
+    body: ChangeUsernameRequest,
+    current_user = Depends(get_current_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Change current user's username after verifying current password.
+    Mounted at /auth/changeusername.
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="not authenticated")
+
+    # verify provided (client-side hashed) password against stored slow hash
+    if not verify_password(body.password, current_user.hashed_password):
+        raise HTTPException(status_code=401, detail="invalid credentials")
+
+    new_username_clean = (body.new_username or "").strip()
+    if not new_username_clean:
+        raise HTTPException(status_code=400, detail="new_username required")
+
+    # check username uniqueness
+    q = await session.execute(
+        select(User).where(func.lower(User.username) == func.lower(new_username_clean))
+    )
+    exists = q.scalar_one_or_none()
+    if exists and exists.id != current_user.id:
+        raise HTTPException(status_code=400, detail="username already in use")
+
+    # apply change
+    old_username = current_user.username
+    current_user.username = new_username_clean
+    session.add(current_user)
+    await session.commit()
+
+    # notify user by email (background)
+    subject = "Username changed"
+    mail_body = (
+        f"Hello,\n\n"
+        f"Your username has been changed from {old_username} to {new_username_clean}.\n\n"
+        f"If you did not request this change, please contact support."
+    )
+    loop = asyncio.get_running_loop()
+    sent, err = await loop.run_in_executor(None, send_simple_email, current_user.email, subject, mail_body)
+    if not sent:
+        print(f"[DEV] username change email send failed for {current_user.email}: {err}")
+
+    return {"status": "username_changed", "email_sent": sent}
