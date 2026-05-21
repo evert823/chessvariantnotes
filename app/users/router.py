@@ -241,8 +241,7 @@ async def request_reset_password(
     user = result.scalar_one_or_none()
 
     # Do NOT reveal whether the email exists — avoid account enumeration.
-    if not user:
-        # respond identically to a successful request
+    if not user or not user.is_active:
         return {"status": "reset_requested", "email_sent": False}
 
     # mark user unregistered (so /resetpassword will accept the flow)
