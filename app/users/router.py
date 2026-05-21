@@ -1,6 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status, Response
-from sqlalchemy import select, or_, func
+from sqlalchemy import select, or_, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
 import secrets
@@ -200,6 +200,11 @@ async def login(
     if not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="invalid credentials")
 
+    # record last login time
+    user.last_login_at = datetime.utcnow()
+    session.add(user)
+    await session.commit()
+
     # set session cookie (for PoC). In production use secure session tokens / JWTs.
     response.set_cookie(
         key="user_id",
@@ -246,6 +251,13 @@ async def request_reset_password(
 
     # mark user unregistered (so /resetpassword will accept the flow)
     user.is_verified = False
+
+    # revoke any previous unused password-reset tokens for this user
+    await session.execute(
+        update(Token)
+        .where(Token.user_id == user.id, Token.token_type == "passwordreset", Token.used == False, Token.revoked == False)
+        .values(revoked=True)
+    )
 
     # create token (reuse "verification" type used by reset endpoint)
     token_str = secrets.token_urlsafe(32)
