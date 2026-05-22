@@ -19,6 +19,10 @@ export function initResetPassword({ formId, passwordId, buttonId, messageId }) {
   const token = params.get('token') || '';
   const username = params.get('username') || '';
 
+  // display username on the page if element present
+  const userEl = document.getElementById('resetUser');
+  if (userEl) userEl.textContent = username;
+
   if (!token || !username) {
     msg.textContent = 'Invalid reset link (missing token/username).';
     button.disabled = true;
