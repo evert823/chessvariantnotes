@@ -238,6 +238,10 @@ async def request_reset_password(
     - create a verification token for password reset
     - set user.is_verified = False (unregistered)
     - send email with reset link containing token + username and mention username in body
+
+    To avoid account enumeration timing differences we always attempt to send an email
+    to the provided address. If the email exists we send a reset link; otherwise we
+    send a generic notice. The response is identical either way.
     """
     if not body.email:
         raise HTTPException(status_code=400, detail="email required")
@@ -245,52 +249,68 @@ async def request_reset_password(
     result = await session.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
 
-    # Do NOT reveal whether the email exists — avoid account enumeration.
-    if not user or not user.is_active:
-        return {"status": "reset_requested", "email_sent": False}
+    # If user exists and active -> create token, mark unverified, revoke old tokens
+    if user and user.is_active:
+        # mark user unregistered (so /resetpassword will accept the flow)
+        user.is_verified = False
 
-    # mark user unregistered (so /resetpassword will accept the flow)
-    user.is_verified = False
+        # revoke any previous unused password-reset tokens for this user
+        await session.execute(
+            update(Token)
+            .where(Token.user_id == user.id, Token.token_type == "passwordreset", Token.used == False, Token.revoked == False)
+            .values(revoked=True)
+        )
 
-    # revoke any previous unused password-reset tokens for this user
-    await session.execute(
-        update(Token)
-        .where(Token.user_id == user.id, Token.token_type == "passwordreset", Token.used == False, Token.revoked == False)
-        .values(revoked=True)
+        # create token (passwordreset type)
+        token_str = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(hours=int(os.getenv("REG_TOKEN_HOURS", "24")))
+        token = Token(
+            user_id=user.id,
+            token=token_str,
+            token_type="passwordreset",
+            expires_at=expires_at,
+            used=False,
+            revoked=False,
+        )
+        session.add_all([user, token])
+        await session.commit()
+
+        # build reset URL (include token + username)
+        site_base = os.getenv("SITE_URL", "https://vps1.mcs2web.com")
+        reset_url = f"{site_base}/chessvariantnotes/resetpassword.html?token={quote_plus(token_str)}&username={quote_plus(user.username)}"
+
+        subject = "Password reset request"
+        mail_body = (
+            f"Hello {user.username},\n\n"
+            f"A password reset was requested for your account. Use the link below to reset your password:\n\n"
+            f"{reset_url}\n\n"
+            f"Username: {user.username}\n\n"
+            f"If you did not request this, please ignore this email."
+        )
+
+        # send email in background thread
+        loop = asyncio.get_running_loop()
+        sent, err = await loop.run_in_executor(None, send_simple_email, user.email, subject, mail_body)
+        if not sent:
+            # dev fallback
+            print(f"[DEV] password reset link for {user.email}: {reset_url} (send_error={err})")
+
+        return {"status": "reset_requested", "email_sent": sent}
+
+    # For non-existing or inactive addresses: send a generic notice email to avoid timing-based enumeration
+    subject = "Password reset requested"
+    generic_body = (
+        "Hello,\n\n"
+        "A request was received to reset the password for this email address. If you initiated this request, follow the instructions you received. "
+        "If you did not request a reset, no action is required.\n\n"
+        "If you have an account with us you will receive a reset link. If not, you can ignore this message."
     )
 
-    # create token (reuse "verification" type used by reset endpoint)
-    token_str = secrets.token_urlsafe(32)
-    expires_at = datetime.utcnow() + timedelta(hours=int(os.getenv("REG_TOKEN_HOURS", "24")))
-    token = Token(
-        user_id=user.id,
-        token=token_str,
-        token_type="passwordreset",
-        expires_at=expires_at,
-        used=False,
-        revoked=False,
-    )
-    session.add_all([user, token])
-    await session.commit()
-
-    # build reset URL (include token + username per requirement)
-    site_base = os.getenv("SITE_URL", "https://vps1.mcs2web.com")
-    reset_url = f"{site_base}/chessvariantnotes/resetpassword.html?token={quote_plus(token_str)}&username={quote_plus(user.username)}"
-
-    # send email in background thread
-    subject = "Password reset request"
-    mail_body = (
-        f"Hello {user.username},\n\n"
-        f"A password reset was requested for your account. Use the link below to reset your password:\n\n"
-        f"{reset_url}\n\n"
-        f"Username: {user.username}\n\n"
-        f"If you did not request this, please ignore this email."
-    )
     loop = asyncio.get_running_loop()
-    sent, err = await loop.run_in_executor(None, send_simple_email, user.email, subject, mail_body)
+    sent, err = await loop.run_in_executor(None, send_simple_email, body.email, subject, generic_body)
     if not sent:
-        # dev fallback
-        print(f"[DEV] password reset link for {user.email}: {reset_url} (send_error={err})")
+        # dev fallback logging
+        print(f"[DEV] generic password reset notice send failed for {body.email}: {err}")
 
     return {"status": "reset_requested", "email_sent": sent}
 
