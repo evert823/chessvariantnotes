@@ -9,7 +9,7 @@ HOST = os.getenv("SMTP_HOST")
 PORT = int(os.getenv("SMTP_PORT", "587"))
 USER = os.getenv("SMTP_USER")
 PASS = os.getenv("SMTP_PASS")
-TO = "ejkarman@ijfinity.nl"
+TO = "blabla@bla.nl"
 USE_TLS = os.getenv("SMTP_TLS", "true").lower() in ("1", "true", "yes")
 
 if not all([HOST, PORT, USER, PASS]):
