@@ -9,6 +9,7 @@ import asyncio
 from dotenv import load_dotenv
 from app.users.security import hash_password, verify_password
 from urllib.parse import quote_plus
+from app.users.auth import create_access_token, decode_access_token
 
 # load .env values
 load_dotenv()
@@ -36,7 +37,10 @@ async def get_current_user(
     request: Request,
     session: AsyncSession = Depends(get_async_session),
 ):
-    user_id = request.cookies.get("user_id")
+    token = request.cookies.get("access_token")
+    if not token:
+        return None
+    user_id = decode_access_token(token)
     if not user_id:
         return None
     result = await session.execute(select(User).where(User.id == user_id))
@@ -205,15 +209,17 @@ async def login(
     session.add(user)
     await session.commit()
 
-    # set session cookie (for PoC). In production use secure session tokens / JWTs.
+    # create JWT access token and set session cookie (HttpOnly)
+    expires_seconds = 3600
+    token = create_access_token(userid=user.id, expires_delta=timedelta(seconds=expires_seconds))
     response.set_cookie(
-        key="user_id",
-        value=user.id,
+        key="access_token",
+        value=token,
         httponly=True,
         secure=True,
         samesite="lax",
         path="/",
-        max_age=3600,  # adjust as needed
+        max_age=expires_seconds,
     )
     return user
 
@@ -222,7 +228,7 @@ async def logout(response: Response):
     """
     Clear session cookie.
     """
-    response.delete_cookie("user_id", path="/")
+    response.delete_cookie("access_token", path="/")
     return {"status": "logged_out"}
 
 
