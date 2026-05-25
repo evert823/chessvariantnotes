@@ -35,3 +35,7 @@ class ResetPasswordRequest2(BaseModel):
     username: str
     password: str  # client-sent hashed password (as you specified)
 
+class DeleteAccountRequest(BaseModel):
+    email: EmailStr
+    token: str
+

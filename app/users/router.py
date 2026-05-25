@@ -17,7 +17,7 @@ load_dotenv()
 from app.users.db import get_async_session
 from app.users.models import User, Token
 from app.users.schemas import UserRead, RegisterRequest, LoginRequest
-from app.users.schemas import ResetPasswordRequest1, ResetPasswordRequest2, ChangeUsernameRequest
+from app.users.schemas import ResetPasswordRequest1, ResetPasswordRequest2, ChangeUsernameRequest, DeleteAccountRequest
 from app.users.mailer import send_confirmation_email, send_simple_email
 
 router = APIRouter()
@@ -450,6 +450,180 @@ async def reset_password(
         print(f"[DEV] password reset confirmation email send failed for {user.email}: {err}")
 
     return {"status": "password_reset", "email_sent": sent}
+
+@router.post("/requestdeleteaccount")
+async def request_delete_account(
+    body: ResetPasswordRequest1,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Request account deletion:
+    - accepts email address
+    - if a user exists for that email, create an accountdelete token and email a link
+    - otherwise send a generic notice to avoid account enumeration
+    """
+    if not body.email:
+        raise HTTPException(status_code=400, detail="email required")
+
+    result = await session.execute(select(User).where(User.email == body.email))
+    user = result.scalar_one_or_none()
+
+    if user:
+        # revoke previous unused account-delete tokens for this user
+        await session.execute(
+            update(Token)
+            .where(
+                Token.user_id == user.id,
+                Token.token_type == "accountdelete",
+                Token.used == False,
+                Token.revoked == False
+            )
+            .values(revoked=True)
+        )
+
+        token_str = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(hours=int(os.getenv("REG_TOKEN_HOURS", "24")))
+        token = Token(
+            user_id=user.id,
+            token=token_str,
+            token_type="accountdelete",
+            expires_at=expires_at,
+            used=False,
+            revoked=False,
+        )
+        session.add(token)
+        await session.commit()
+
+        site_base = os.getenv("SITE_URL", "https://vps1.mcs2web.com")
+        delete_url = f"{site_base}/auth/deleteaccount?token={quote_plus(token_str)}&username={quote_plus(user.username)}"
+
+        subject = "Account deletion requested"
+        mail_body = (
+            f"Hello {user.username},\n\n"
+            f"A request was received to delete the account associated with this email address. "
+            f"To confirm deletion, click the link below:\n\n{delete_url}\n\n"
+            f"If you did not request this, no action is required."
+        )
+
+        loop = asyncio.get_running_loop()
+        sent, err = await loop.run_in_executor(None, send_simple_email, user.email, subject, mail_body)
+        if not sent:
+            print(f"[DEV] account delete link for {user.email}: {delete_url} (send_error={err})")
+
+        return {"status": "delete_requested", "email_sent": sent}
+
+    # Generic notice for non-existing addresses (avoid enumeration)
+    subject = "Account deletion requested"
+    generic_body = (
+        "Hello,\n\n"
+        "A request was received to delete an account associated with this email address. "
+        "If you initiated this request, follow the instructions you received. If you did not, no action is required."
+    )
+
+    loop = asyncio.get_running_loop()
+    sent, err = await loop.run_in_executor(None, send_simple_email, body.email, subject, generic_body)
+    if not sent:
+        print(f"[DEV] generic account delete notice send failed for {body.email}: {err}")
+
+    return {"status": "delete_requested", "email_sent": sent}
+
+@router.post("/deleteaccount")
+async def delete_account(
+    body: DeleteAccountRequest,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Delete account:
+    - accepts email + token
+    - validate token (type=accountdelete, belongs to user, not revoked/used/expired)
+    - send deletion notification email
+    - rename username to deleted_account_xxx (unique sequence)
+    - clear email, hashed_password, set is_active/is_verified False, set deleted_at
+    - revoke all tokens for the user (revoked=True)
+    """
+    if not (body.email and body.token):
+        raise HTTPException(status_code=400, detail="email and token required")
+    # load token
+    result = await session.execute(
+        select(Token).where(Token.token == body.token, Token.token_type == "accountdelete")
+    )
+    tkn = result.scalar_one_or_none()
+    if not tkn:
+        raise HTTPException(status_code=404, detail="invalid token")
+    if tkn.revoked:
+        raise HTTPException(status_code=400, detail="token revoked")
+    if tkn.used:
+        return {"status": "already_used"}
+    if tkn.expires_at and datetime.utcnow() > tkn.expires_at:
+        raise HTTPException(status_code=400, detail="token expired")
+
+    # find user by email
+    result = await session.execute(select(User).where(User.email == body.email))
+    user = result.scalar_one_or_none()
+    if not user or user.id != tkn.user_id:
+        # do not reveal which failed; return generic invalid token/user
+        raise HTTPException(status_code=404, detail="invalid token or user")
+
+    # mark token used (idempotency) and prepare to revoke tokens
+    tkn.used = True
+    session.add(tkn)
+
+    # compute next deleted_account sequence
+    q = await session.execute(select(User.username).where(User.username.like("deleted_account_%")))
+    deleted_names = q.scalars().all()
+    max_seq = 0
+    for name in deleted_names:
+        try:
+            seq = int(name.rsplit("_", 1)[-1])
+            if seq > max_seq:
+                max_seq = seq
+        except Exception:
+            continue
+    next_seq = max_seq + 1
+    new_username = f"deleted_account_{next_seq}"
+
+    # ensure unique (very unlikely race) - loop until available
+    while True:
+        q2 = await session.execute(select(User).where(func.lower(User.username) == func.lower(new_username)))
+        exists = q2.scalar_one_or_none()
+        if not exists:
+            break
+        next_seq += 1
+        new_username = f"deleted_account_{next_seq}"
+
+    # apply deletion changes
+    user.username = new_username
+    rand_int = secrets.randbelow(10000000)
+    user.email = f"{new_username}_{rand_int}@<deleted>"
+    user.hashed_password = ""
+    user.is_active = False
+    user.is_verified = False
+    user.deleted_at = datetime.utcnow()
+    session.add(user)
+
+    # revoke all tokens for this user (including the accountdelete token) if not already revoked
+    await session.execute(
+        update(Token)
+        .where(Token.user_id == user.id, Token.revoked == False)
+        .values(revoked=True)
+    )
+
+    await session.commit()
+
+    # notify (background)
+    site_base = os.getenv("SITE_URL", "https://vps1.mcs2web.com")
+    subject = "Account deleted"
+    mail_body = (
+        f"Hello,\n\n"
+        f"Your account on {site_base} has been deleted.\n\n"
+        f"If you did not request this, please contact support."
+    )
+    loop = asyncio.get_running_loop()
+    sent, err = await loop.run_in_executor(None, send_simple_email, body.email, subject, mail_body)
+    if not sent:
+        print(f"[DEV] account deletion email send failed for {body.email}: {err}")
+
+    return {"status": "deleted", "email_sent": sent, "deleted_username": new_username}
 
 @router.post("/changeusername")
 async def change_username(
