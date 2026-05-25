@@ -29,13 +29,6 @@ def create_access_token(userid: str, expires_delta: timedelta):
         token = token.decode("utf-8")
     return token
 
-def decode_access_token(token: str) -> Optional[str]:
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
-        return None
-    return payload.get("sub")
-
 # add this helper to return full payload (used for session jti validation)
 def decode_token_payload(token: str) -> Optional[dict]:
     try:

@@ -9,7 +9,7 @@ import asyncio
 from dotenv import load_dotenv
 from app.users.security import hash_password, verify_password
 from urllib.parse import quote_plus
-from app.users.auth import create_access_token, decode_access_token, decode_token_payload
+from app.users.auth import create_access_token, decode_token_payload
 
 # load .env values
 load_dotenv()
