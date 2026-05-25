@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Request account deletion - chessvariantnotes</title>
+  <link rel="icon" href="/images/myicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="./css/chessvariantnotes.css">
+</head>
+<body>
+  <div id="authArea"></div>
+
+  <h1>Request account deletion</h1>
+
+  <form id="requestDeleteForm">
+    <label for="emailInput">Email</label><br>
+    <input id="emailInput" type="email" required><br><br>
+
+    <button id="deleteBtn" type="submit">Send deletion link</button>
+  </form>
+
+  <div id="deleteMsg" role="status" style="margin-top:12px;"></div>
+
+  <script type="module">
+    import { renderAuthArea } from './js/auth.js';
+    import { initRequestDeleteAccount } from './js/requestdeleteaccount.js';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await renderAuthArea();
+      initRequestDeleteAccount({
+        formId: 'requestDeleteForm',
+        emailId: 'emailInput',
+        buttonId: 'deleteBtn',
+        messageId: 'deleteMsg'
+      });
+    });
+  </script>
+</body>
+</html>

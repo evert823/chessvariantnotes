@@ -32,7 +32,7 @@ export async function renderAuthArea(containerId = 'authArea') {
   const user = await getCurrentUser();
   if (user) {
     statusEl.textContent = `Logged in as ${escapeHtml(user.username || user.email || user.id)}`;
-    actionsEl.innerHTML = `<button id="logoutBtn">Logout</button> <button id="resetBtn" style="margin-left:6px">Reset password</button> <button id="changeUsernameBtn" style="margin-left:6px">Change username</button>`;
+    actionsEl.innerHTML = `<button id="logoutBtn">Logout</button> <button id="resetBtn" style="margin-left:6px">Reset password</button> <button id="changeUsernameBtn" style="margin-left:6px">Change username</button> <button id="requestDeleteBtn" style="margin-left:6px">Request account deletion</button>`;
     document.getElementById('logoutBtn').addEventListener('click', async () => {
       await logout();
       await renderAuthArea(containerId);
@@ -43,11 +43,15 @@ export async function renderAuthArea(containerId = 'authArea') {
     document.getElementById('changeUsernameBtn').addEventListener('click', () => {
       window.location.href = '/chessvariantnotes/changeusername.html';
     });
+    document.getElementById('requestDeleteBtn').addEventListener('click', () => {
+      window.location.href = '/chessvariantnotes/requestdeleteaccount.html';
+    });
   } else {
     statusEl.textContent = 'Not logged in';
-    actionsEl.innerHTML = `<button id="loginBtn">Login</button> <button id="signupBtn" style="margin-left:6px">Sign up</button> <button id="resetBtn" style="margin-left:6px">Reset password</button>`;
+    actionsEl.innerHTML = `<button id="loginBtn">Login</button> <button id="signupBtn" style="margin-left:6px">Sign up</button> <button id="resetBtn" style="margin-left:6px">Reset password</button> <button id="requestDeleteBtn" style="margin-left:6px">Request account deletion</button>`;
     document.getElementById('loginBtn').addEventListener('click', () => { window.location.href = '/chessvariantnotes/login.html'; });
     document.getElementById('signupBtn').addEventListener('click', () => { window.location.href = '/chessvariantnotes/register.html'; });
     document.getElementById('resetBtn').addEventListener('click', () => { window.location.href = '/chessvariantnotes/requestresetpassword.html'; });
+    document.getElementById('requestDeleteBtn').addEventListener('click', () => { window.location.href = '/chessvariantnotes/requestdeleteaccount.html'; });
   }
 }

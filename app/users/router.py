@@ -495,7 +495,7 @@ async def request_delete_account(
         await session.commit()
 
         site_base = os.getenv("SITE_URL", "https://vps1.mcs2web.com")
-        delete_url = f"{site_base}/auth/deleteaccount?token={quote_plus(token_str)}&username={quote_plus(user.username)}"
+        delete_url = f"{site_base}/chessvariantnotes/deleteaccount.html?token={quote_plus(token_str)}&username={quote_plus(user.username)}"
 
         subject = "Account deletion requested"
         mail_body = (
