@@ -9,7 +9,7 @@ import asyncio
 from dotenv import load_dotenv
 from app.users.security import hash_password, verify_password
 from urllib.parse import quote_plus
-from app.users.auth import create_access_token, decode_access_token
+from app.users.auth import create_access_token, decode_access_token, decode_token_payload
 
 # load .env values
 load_dotenv()
@@ -40,9 +40,28 @@ async def get_current_user(
     token = request.cookies.get("access_token")
     if not token:
         return None
-    user_id = decode_access_token(token)
-    if not user_id:
+
+    # validate JWT and session record (server-side)
+    payload = decode_token_payload(token)
+    if not payload:
         return None
+    user_id = payload.get("sub")
+    jti = payload.get("jti")
+    if not user_id or not jti:
+        return None
+
+    # ensure session jti exists and is not revoked/expired
+    result = await session.execute(
+        select(Token).where(
+            Token.token == jti,
+            Token.token_type == "session",
+            Token.revoked == False
+        )
+    )
+    session_token = result.scalar_one_or_none()
+    if not session_token or (session_token.expires_at and datetime.utcnow() > session_token.expires_at):
+        return None
+
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
@@ -210,24 +229,59 @@ async def login(
     await session.commit()
 
     # create JWT access token and set session cookie (HttpOnly)
-    expires_seconds = 3600
+    # read access token lifetime (seconds) from .env, fallback to 3600
+    expires_seconds = int(os.getenv("ACCESS_TOKEN_SECONDS", "3600"))
+    # safety bounds: at least 60s, at most 30 days
+    if expires_seconds < 120:
+        expires_seconds = 120
+    if expires_seconds > 60 * 24:
+        expires_seconds = 60 * 24
     token = create_access_token(userid=user.id, expires_delta=timedelta(seconds=expires_seconds))
+
+    # record server-side session token (jti) so we can revoke/validate it
+    payload = decode_token_payload(token)
+    if payload and payload.get("jti"):
+        session_jti = payload["jti"]
+        session_token = Token(
+            user_id=user.id,
+            token=session_jti,
+            token_type="session",
+            expires_at=datetime.utcnow() + timedelta(seconds=expires_seconds),
+            used=False,
+            revoked=False,
+        )
+        session.add(session_token)
+        await session.commit()
+
+    # set cookie with stricter SameSite
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
         secure=True,
-        samesite="lax",
+        samesite="strict",
         path="/",
         max_age=expires_seconds,
     )
     return user
 
 @router.post("/logout")
-async def logout(response: Response):
+async def logout(response: Response, request: Request, session: AsyncSession = Depends(get_async_session)):
     """
-    Clear session cookie.
+    Revoke all session tokens for the current user and clear the session cookie.
     """
+    token = request.cookies.get("access_token")
+    if token:
+        payload = decode_token_payload(token)
+        user_id = payload.get("sub") if payload else None
+        if user_id:
+            await session.execute(
+                update(Token)
+                .where(Token.user_id == user_id, Token.token_type == "session")
+                .values(revoked=True)
+            )
+            await session.commit()
+
     response.delete_cookie("access_token", path="/")
     return {"status": "logged_out"}
 
@@ -376,6 +430,13 @@ async def reset_password(
     user.is_verified = True
     tkn.used = True
     session.add_all([user, tkn])
+
+    # revoke all active session tokens for this user (log out everywhere)
+    await session.execute(
+        update(Token)
+        .where(Token.user_id == user.id, Token.token_type == "session")
+        .values(revoked=True)
+    )
     await session.commit()
 
     # notify user (background)

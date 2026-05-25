@@ -35,3 +35,11 @@ def decode_access_token(token: str) -> Optional[str]:
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
         return None
     return payload.get("sub")
+
+# add this helper to return full payload (used for session jti validation)
+def decode_token_payload(token: str) -> Optional[dict]:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        return None
+    return payload

@@ -46,6 +46,15 @@ leave page, re-visit page, still logged out
 login
 leave page, re-visit page, still logged in
 
+# Other laptop
+Login laptop 1
+Login laptop 2
+Logout laptop 2
+--> check: also logged out laptop 1
+Login laptop 1
+Password reset from laptop 2
+--> check: also logged out laptop 1
+
 
 # Change password
 Click reset password while logged out
