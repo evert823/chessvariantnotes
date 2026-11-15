@@ -22,6 +22,8 @@ from app.users.mailer import send_confirmation_email, send_simple_email
 
 router = APIRouter()
 
+AUTH_COOKIE_NAME = "chessvariantnotes_access_token"
+
 @router.get("/users", response_model=List[UserRead])
 async def list_users(session: AsyncSession = Depends(get_async_session)):
     """
@@ -36,7 +38,7 @@ async def get_current_user(
     request: Request,
     session: AsyncSession = Depends(get_async_session),
 ):
-    token = request.cookies.get("access_token")
+    token = request.cookies.get(AUTH_COOKIE_NAME)
     if not token:
         return None
 
@@ -182,7 +184,7 @@ async def confirm_registration(
     # send completion email (background)
     site_base = os.getenv("SITE_URL", "https://vps1.mcs2web.com")
     subject = "Registration confirmed"
-    body = f"Your account on {site_base} has been successfully confirmed. You can now login."
+    body = f"Your account on {site_base}/chessvariantnotes has been successfully confirmed. You can now login."
 
     loop = asyncio.get_running_loop()
     sent, err = await loop.run_in_executor(None, send_simple_email, user.email, subject, body)
@@ -254,7 +256,7 @@ async def login(
 
     # set cookie with stricter SameSite
     response.set_cookie(
-        key="access_token",
+        key=AUTH_COOKIE_NAME,
         value=token,
         httponly=True,
         secure=True,
@@ -269,7 +271,7 @@ async def logout(response: Response, request: Request, session: AsyncSession = D
     """
     Revoke all session tokens for the current user and clear the session cookie.
     """
-    token = request.cookies.get("access_token")
+    token = request.cookies.get(AUTH_COOKIE_NAME)
     if token:
         payload = decode_token_payload(token)
         user_id = payload.get("sub") if payload else None
@@ -281,7 +283,7 @@ async def logout(response: Response, request: Request, session: AsyncSession = D
             )
             await session.commit()
 
-    response.delete_cookie("access_token", path="/")
+    response.delete_cookie(AUTH_COOKIE_NAME, path="/")
     return {"status": "logged_out"}
 
 
@@ -441,7 +443,7 @@ async def reset_password(
     # notify user (background)
     site_base = os.getenv("SITE_URL", "https://vps1.mcs2web.com")
     subject = "Account confirmed and password set"
-    mail_body = f"Your account on {site_base} has been confirmed and your password updated."
+    mail_body = f"Your account on {site_base}/chessvariantnotes has been confirmed and your password updated."
 
     loop = asyncio.get_running_loop()
     sent, err = await loop.run_in_executor(None, send_simple_email, user.email, subject, mail_body)
