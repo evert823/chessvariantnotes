@@ -616,7 +616,7 @@ async def delete_account(
     subject = "Account deleted"
     mail_body = (
         f"Hello,\n\n"
-        f"Your account on {site_base} has been deleted.\n\n"
+        f"Your account on {site_base}/chessvariantnotes has been deleted.\n\n"
         f"If you did not request this, please contact support."
     )
     loop = asyncio.get_running_loop()
