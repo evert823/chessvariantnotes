@@ -21,4 +21,4 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix="/chessvariantnotes/api")
-app.include_router(users_router, prefix="/auth")
+app.include_router(users_router, prefix="/chessvariantnotes/auth")

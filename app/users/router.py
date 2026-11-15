@@ -26,7 +26,6 @@ router = APIRouter()
 async def list_users(session: AsyncSession = Depends(get_async_session)):
     """
     Return all users (no hashed_password returned because schema omits it).
-    Mounted at /auth/users (main.py already includes the users router with prefix "/auth").
     """
     result = await session.execute(select(User))
     users = result.scalars().all()
@@ -113,7 +112,7 @@ async def register(
 
     # build confirmation URL using SITE_URL from .env
     site_base = os.getenv("SITE_URL", "https://vps1.mcs2web.com")
-    confirm_url = f"{site_base}/auth/confirm?token={token_str}"
+    confirm_url = f"{site_base}/chessvariantnotes/auth/confirm?token={token_str}"
 
     # send email in background thread to avoid blocking event loop
     loop = asyncio.get_running_loop()
@@ -633,7 +632,6 @@ async def change_username(
 ):
     """
     Change current user's username after verifying current password.
-    Mounted at /auth/changeusername.
     """
     if not current_user:
         raise HTTPException(status_code=401, detail="not authenticated")

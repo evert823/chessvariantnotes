@@ -43,7 +43,7 @@ export function initResetPassword({ formId, passwordId, buttonId, messageId }) {
       // first (client-side) hash
       const firstHash = await sha256Hex(password);
 
-      const res = await fetch('/auth/resetpassword', {
+      const res = await fetch('/chessvariantnotes/auth/resetpassword', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

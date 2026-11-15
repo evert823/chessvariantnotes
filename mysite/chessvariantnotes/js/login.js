@@ -34,7 +34,7 @@ export function initLogin(ids = {}) {
 
             const hashed = await sha256Hex(password);
 
-            const res = await fetch('/auth/login', {
+            const res = await fetch('/chessvariantnotes/auth/login', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },

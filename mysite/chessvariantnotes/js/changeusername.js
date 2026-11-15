@@ -32,7 +32,7 @@ export function initChangeUsername(ids = {}) {
 
       const hashed = await sha256Hex(password);
 
-      const res = await fetch('/auth/changeusername', {
+      const res = await fetch('/chessvariantnotes/auth/changeusername', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ new_username, password: hashed })

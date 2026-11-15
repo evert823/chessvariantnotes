@@ -22,7 +22,7 @@ export function initRequestDeleteAccount({ formId, emailId, buttonId, messageId 
     msg.textContent = "Sending...";
 
     try {
-      await fetch('/auth/requestdeleteaccount', {
+      await fetch('/chessvariantnotes/auth/requestdeleteaccount', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),

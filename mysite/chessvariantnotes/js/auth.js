@@ -1,6 +1,6 @@
 export async function getCurrentUser() {
   try {
-    const res = await fetch('/auth/me', { method: 'GET', credentials: 'include' });
+    const res = await fetch('/chessvariantnotes/auth/me', { method: 'GET', credentials: 'include' });
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -14,7 +14,7 @@ function escapeHtml(s) {
 
 export async function logout() {
   localStorage.removeItem('userId');
-  try { await fetch('/auth/logout', { method: 'POST', credentials: 'include' }); } catch {}
+  try { await fetch('/chessvariantnotes/auth/logout', { method: 'POST', credentials: 'include' }); } catch {}
 }
 
 export async function renderAuthArea(containerId = 'authArea') {

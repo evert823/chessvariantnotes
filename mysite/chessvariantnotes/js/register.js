@@ -29,7 +29,7 @@ export function initRegister(ids = {}) {
       // client-side hash (you said hashed password will be sent)
       const hashed = await sha256Hex(password);
 
-      const res = await fetch('/auth/register', {
+      const res = await fetch('/chessvariantnotes/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, username, password: hashed })

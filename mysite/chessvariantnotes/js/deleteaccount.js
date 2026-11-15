@@ -34,7 +34,7 @@ export function initDeleteAccount({ formId, emailId, buttonId, messageId }) {
     msg.textContent = 'Deleting account...';
 
     try {
-      const res = await fetch('/auth/deleteaccount', {
+      const res = await fetch('/chessvariantnotes/auth/deleteaccount', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, email }),
